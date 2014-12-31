@@ -103,8 +103,10 @@ class Identity(identity.Driver):
             # We need to invert the enabled value for the old model object
             # to prevent the LDAP update code from thinking that the enabled
             # values are already equal.
-            user['enabled'] = not user['enabled']
-            old_obj['enabled'] = not old_obj['enabled']
+            if 'enabled' in user:
+              user['enabled'] = not user['enabled']
+            if 'enabled' in old_obj:
+              old_obj['enabled'] = not old_obj['enabled']
 
         self.user.update(user_id, user, old_obj)
         return self.user.get_filtered(user_id)
