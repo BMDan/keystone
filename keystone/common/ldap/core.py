@@ -1070,6 +1070,11 @@ class KeystoneLDAPHandler(LDAPHandler):
         dn_utf8 = utf8_encode(dn)
         return self.conn.delete_s(dn_utf8)
 
+    def passwd_s(self, user, oldpw, newpw):
+        LOG.debug("LDAP passwd update: dn=%s", user)
+        user_utf8 = utf8_encode(user)
+        return self.conn.passwd_s(user, oldpw, newpw)
+
     def delete_ext_s(self, dn, serverctrls=None, clientctrls=None):
         LOG.debug('LDAP delete_ext: dn=%s serverctrls=%s clientctrls=%s',
                   dn, serverctrls, clientctrls)
