@@ -97,6 +97,33 @@ class Identity(identity.Driver):
         if 'name' in user and old_obj.get('name') != user['name']:
             raise exception.Conflict(_('Cannot change user name'))
 
+        if 'password' in user: # If we are updating password...
+            LOG.debug(_("Attempting RFC3062 password update."))
+            conn = self.user.get_connection()
+            try:
+                # Try an RFC3062 password update.  Not all servers will support this, though.
+                conn.passwd_s(self.user._id_to_dn(user_id),None,user['password'])
+                # If the update succeeded (no exceptions raised, anyway), then remove this key from the update dict
+                del user['password']
+                LOG.debug(_("Successfully used RFC3062 to update password."))
+            except ldap.NO_SUCH_OBJECT:
+                raise self.user._not_found(object_id)
+            except ldap.CONSTRAINT_VIOLATION:
+                # Sadly, this isn't pushed to the user in a very useful way, but at least it will consistently fail.
+                raise exception.ValidationError(_("The new password provided does not meet the history and/or complexity requirements imposed by your organization."))
+            except ldap.CONFIDENTIALITY_REQUIRED:
+                # If we aren't configured to use SSL, fall back onto the non-RFC3062 update method.
+                LOG.warning(_("Not using RFC3062 to update password because the backend LDAP link isn't secure."))
+                pass
+            except ldap.LDAPError as ex:
+                # More than likely, this is an indication that the server doesn't support RFC3062.  Therefore,
+                # mask this off; we'll try doing it the old-fashioned way, below.
+                LOG.warning(_("Failed to use RFC3062 to update a password because of an exception of type '%(ex)s'.  Falling back to ldapModify."),
+                          dict(ex=str(ex)))
+                pass
+            finally:
+                conn.unbind_s()
+
         if self.user.enabled_mask:
             self.user.mask_enabled_attribute(user)
         elif self.user.enabled_invert and not self.user.enabled_emulation:
